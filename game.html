@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14251d">
+  <title>Chalkboard Tic-Tac-Toe</title>
+  <style>
+    :root { color-scheme: dark; --chalk: #f8f3de; --muted: #c8d1b3; --board: #173326; --wood: #9a5e31; --gold: #e4d17c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; color: var(--chalk); font: 16px/1.5 system-ui, sans-serif; background: radial-gradient(circle at 20% 15%, #294738, transparent 35%), linear-gradient(135deg,#1c3428,#10271d 65%,#183326); }
+    .game { width: min(100%, 520px); text-align: center; }
+    h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(2.2rem, 8vw, 3.5rem); letter-spacing: -.04em; }
+    .subtitle { margin: 5px 0 22px; color: var(--muted); }
+    .panel { padding: clamp(18px, 5vw, 30px); border: 10px solid var(--wood); border-radius: 20px; background: var(--board); box-shadow: inset 0 0 0 2px #2d170a7a, 0 18px 40px #0005; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    #status { min-height: 1.5em; text-align: left; font-weight: 700; }
+    button { font: inherit; }
+    .reset { border: 1px solid #e4d17c88; border-radius: 999px; padding: 8px 14px; color: #14251d; background: var(--gold); font-weight: 800; cursor: pointer; }
+    .reset:hover { filter: brightness(1.08); }
+    .reset:focus-visible, .cell:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; aspect-ratio: 1; }
+    .cell { display: grid; place-items: center; min-width: 0; border: 1px solid #dce8c930; border-radius: 12px; color: var(--chalk); background: #0e2118b8; font: 700 clamp(3rem, 16vw, 5rem)/1 Georgia, serif; cursor: pointer; transition: background .15s, transform .15s; }
+    .cell:hover:enabled { background: #254634; transform: translateY(-2px); }
+    .cell:disabled { cursor: default; }
+    .cell.x { color: #f4d96b; }
+    .cell.o { color: #b6d6c1; }
+    .help { margin: 17px 0 0; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 420px) { body { padding: 14px; } .panel { border-width: 7px; } .toolbar { align-items: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>Chalkboard Tic-Tac-Toe</h1>
+    <p class="subtitle">A quick game of Xs and Os</p>
+    <section class="panel" aria-label="Tic-tac-toe game">
+      <div class="toolbar">
+        <p id="status" role="status" aria-live="polite">Your turn — you are X.</p>
+        <button class="reset" id="reset" type="button">New game</button>
+      </div>
+      <div class="grid" role="group" aria-label="Game board">
+        <button class="cell" type="button" data-cell="0" aria-label="Row 1, column 1, empty"></button>
+        <button class="cell" type="button" data-cell="1" aria-label="Row 1, column 2, empty"></button>
+        <button class="cell" type="button" data-cell="2" aria-label="Row 1, column 3, empty"></button>
+        <button class="cell" type="button" data-cell="3" aria-label="Row 2, column 1, empty"></button>
+        <button class="cell" type="button" data-cell="4" aria-label="Row 2, column 2, empty"></button>
+        <button class="cell" type="button" data-cell="5" aria-label="Row 2, column 3, empty"></button>
+        <button class="cell" type="button" data-cell="6" aria-label="Row 3, column 1, empty"></button>
+        <button class="cell" type="button" data-cell="7" aria-label="Row 3, column 2, empty"></button>
+        <button class="cell" type="button" data-cell="8" aria-label="Row 3, column 3, empty"></button>
+      </div>
+      <p class="help">You play X. The computer plays O. Choose a square to begin.</p>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const cells = [...document.querySelectorAll(".cell")];
+      const status = document.getElementById("status");
+      const reset = document.getElementById("reset");
+      const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      let board = Array(9).fill("");
+      let finished = false;
+
+      function winner(mark) {
+        return lines.some(([a,b,c]) => board[a] === mark && board[b] === mark && board[c] === mark);
+      }
+      function paint() {
+        cells.forEach((cell, i) => {
+          cell.textContent = board[i];
+          cell.className = "cell" + (board[i] ? " " + board[i].toLowerCase() : "");
+          cell.disabled = finished || Boolean(board[i]);
+          const row = Math.floor(i / 3) + 1;
+          const col = i % 3 + 1;
+          cell.setAttribute("aria-label", `Row ${row}, column ${col}, ${board[i] || "empty"}`);
+        });
+      }
+      function endTurn(mark) {
+        if (winner(mark)) {
+          finished = true;
+          status.textContent = mark === "X" ? "You win! Great chalk work." : "The computer wins. Try again!";
+          return true;
+        }
+        if (board.every(Boolean)) {
+          finished = true;
+          status.textContent = "It’s a draw! Play another round?";
+          return true;
+        }
+        return false;
+      }
+      function computerMove() {
+        // Take a winning move, block the player's winning move, then prefer center/corners.
+        const findMove = (mark) => {
+          for (const [a,b,c] of lines) {
+            const trio = [a,b,c];
+            const open = trio.find(i => !board[i]);
+            if (open !== undefined && trio.filter(i => board[i] === mark).length === 2) return open;
+          }
+          return -1;
+        };
+        let move = findMove("O");
+        if (move < 0) move = findMove("X");
+        if (move < 0 && !board[4]) move = 4;
+        if (move < 0) {
+          const open = [0,2,6,8].filter(i => !board[i]);
+          if (open.length) move = open[Math.floor(Math.random() * open.length)];
+        }
+        if (move < 0) {
+          const open = board.map((v,i) => v ? -1 : i).filter(i => i >= 0);
+          move = open[Math.floor(Math.random() * open.length)];
+        }
+        if (move >= 0) board[move] = "O";
+        if (!endTurn("O")) status.textContent = "Your turn — you are X.";
+      }
+      cells.forEach((cell, i) => cell.addEventListener("click", () => {
+        if (finished || board[i]) return;
+        board[i] = "X";
+        if (!endTurn("X")) computerMove();
+        paint();
+      }));
+      reset.addEventListener("click", () => {
+        board = Array(9).fill("");
+        finished = false;
+        status.textContent = "Your turn — you are X.";
+        paint();
+        cells[0].focus();
+      });
+      paint();
+    })();
+  </script>
+</body>
+</html>
